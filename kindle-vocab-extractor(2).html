@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Reading Room — Kindle Vocabulary Extractor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400;1,8..60,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink: #1B2430;
+    --ink-soft: #232E3D;
+    --ink-line: #33415433;
+    --paper: #FBF7EE;
+    --paper-shadow: #00000030;
+    --paper-line: #E4DCC8;
+    --text-dark: #2B2620;
+    --text-muted: #746B58;
+    --text-on-ink-muted: #A8B2C0;
+    --accent: #E8A33D;
+    --accent-deep: #C77F1F;
+    --rule-red: #A6433C;
+    --teal: #4C7A7D;
+    --radius-card: 3px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--ink);
+    color: var(--text-on-ink-muted);
+    font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh;
+  }
+
+  body {
+    background-image:
+      radial-gradient(circle at 15% 0%, #26334533 0%, transparent 45%),
+      radial-gradient(circle at 90% 15%, #26334522 0%, transparent 40%);
+  }
+
+  .wrap {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 56px 24px 80px;
+  }
+
+  header.hero {
+    margin-bottom: 40px;
+  }
+
+  header.hero h1 {
+    font-family: 'Source Serif 4', serif;
+    font-weight: 700;
+    font-size: clamp(2.2rem, 5vw, 3.2rem);
+    color: #F6F1E4;
+    margin: 0 0 10px;
+    letter-spacing: -0.01em;
+  }
+
+  header.hero p {
+    font-size: 1.02rem;
+    line-height: 1.55;
+    color: var(--text-on-ink-muted);
+    max-width: 52ch;
+    margin: 0;
+  }
+
+  header.hero p em {
+    color: var(--accent);
+    font-style: normal;
+    border-bottom: 1px solid var(--accent-deep);
+  }
+
+  /* Dropzone */
+  .dropzone {
+    margin-top: 32px;
+    border: 1.5px dashed #465370;
+    border-radius: var(--radius-card);
+    padding: 28px 24px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    background: var(--ink-soft);
+    transition: border-color 0.15s ease, background 0.15s ease;
+    cursor: pointer;
+  }
+
+  .dropzone:hover, .dropzone.drag {
+    border-color: var(--accent);
+    background: #263349;
+  }
+
+  .dropzone svg { flex-shrink: 0; }
+
+  .dropzone .dz-text strong {
+    display: block;
+    color: #F6F1E4;
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+
+  .dropzone .dz-text span {
+    font-size: 0.85rem;
+    color: var(--text-on-ink-muted);
+  }
+
+  .dropzone .dz-text code {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    background: #101823;
+    padding: 1px 6px;
+    border-radius: 2px;
+    color: #C7D0DE;
+  }
+
+  #file-input { display: none; }
+
+  /* Status / error */
+  .status-msg {
+    margin-top: 20px;
+    padding: 14px 18px;
+    border-radius: var(--radius-card);
+    font-size: 0.92rem;
+    line-height: 1.5;
+    display: none;
+  }
+  .status-msg.error {
+    display: block;
+    background: #3A1F22;
+    color: #F1C6C2;
+    border-left: 3px solid var(--rule-red);
+  }
+  .status-msg.loading {
+    display: block;
+    background: var(--ink-soft);
+    color: var(--text-on-ink-muted);
+    border-left: 3px solid var(--teal);
+  }
+
+  /* Toolbar */
+  .toolbar {
+    margin-top: 40px;
+    display: none;
+    gap: 14px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+  .toolbar.active { display: flex; }
+
+  .stats {
+    font-family: 'Source Serif 4', serif;
+    font-size: 1.05rem;
+    color: #F6F1E4;
+  }
+  .stats strong { color: var(--accent); font-weight: 600; }
+
+  .toolbar-controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .export-note {
+    flex-basis: 100%;
+    font-size: 0.76rem;
+    color: #5C6B85;
+    margin-top: 2px;
+  }
+
+  .toolbar input[type="search"] {
+    background: var(--ink-soft);
+    border: 1px solid #3A4760;
+    color: #F0EBDD;
+    padding: 9px 12px;
+    border-radius: 2px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.88rem;
+    width: 200px;
+  }
+  .toolbar input[type="search"]::placeholder { color: #6E7C93; }
+  .toolbar input[type="search"]:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .toolbar select {
+    background: var(--ink-soft);
+    border: 1px solid #3A4760;
+    color: #F0EBDD;
+    padding: 9px 10px;
+    border-radius: 2px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.88rem;
+  }
+  .toolbar select:focus { outline: none; border-color: var(--accent); }
+
+  .random-controls {
+    display: none;
+    align-items: center;
+    gap: 8px;
+  }
+  .random-controls.active { display: flex; }
+  .random-controls span {
+    font-size: 0.82rem;
+    color: var(--text-on-ink-muted);
+    white-space: nowrap;
+  }
+  .toolbar input[type="number"] {
+    background: var(--ink-soft);
+    border: 1px solid #3A4760;
+    color: #F0EBDD;
+    padding: 9px 8px;
+    border-radius: 2px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.88rem;
+    width: 64px;
+  }
+  .toolbar input[type="number"]:focus { outline: none; border-color: var(--accent); }
+
+  .btn {
+    background: transparent;
+    border: 1px solid var(--accent-deep);
+    color: var(--accent);
+    padding: 9px 14px;
+    border-radius: 2px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .btn:hover { background: var(--accent); color: #241705; }
+  .btn:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* Cards */
+  #cards-container {
+    margin-top: 28px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .card {
+    background: var(--paper);
+    border-radius: var(--radius-card);
+    padding: 20px 22px 18px 30px;
+    position: relative;
+    box-shadow: 0 6px 18px var(--paper-shadow);
+    background-image: repeating-linear-gradient(
+      transparent, transparent 27px, var(--paper-line) 28px
+    );
+    background-position: 0 46px;
+  }
+
+  .card::before {
+    content: "";
+    position: absolute;
+    left: 14px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--rule-red);
+    opacity: 0.55;
+  }
+
+  .card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+
+  .card-word {
+    font-family: 'Source Serif 4', serif;
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: var(--text-dark);
+  }
+
+  .card-meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .card-sentence {
+    font-family: 'Source Serif 4', serif;
+    font-style: italic;
+    font-size: 1.02rem;
+    line-height: 1.6;
+    color: var(--text-dark);
+    margin: 4px 0 10px;
+  }
+
+  .card-sentence mark {
+    background: var(--accent);
+    color: #241705;
+    font-style: normal;
+    padding: 0 3px;
+    border-radius: 2px;
+  }
+
+  .card-sentence.none {
+    color: var(--text-muted);
+    font-style: normal;
+    font-size: 0.9rem;
+  }
+
+  .card-source {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    border-top: 1px solid var(--paper-line);
+    padding-top: 8px;
+  }
+  .card-source .book-title { color: var(--teal); font-style: italic; }
+
+  /* Empty state */
+  .empty-state {
+    display: none;
+    text-align: center;
+    padding: 50px 20px;
+    color: var(--text-on-ink-muted);
+  }
+  .empty-state.active { display: block; }
+  .empty-state h3 {
+    font-family: 'Source Serif 4', serif;
+    color: #F6F1E4;
+    font-weight: 600;
+    font-size: 1.2rem;
+    margin-bottom: 6px;
+  }
+
+  footer {
+    margin-top: 56px;
+    font-size: 0.78rem;
+    color: #5C6B85;
+    line-height: 1.6;
+    border-top: 1px solid var(--ink-line);
+    padding-top: 18px;
+  }
+
+  @media (max-width: 560px) {
+    .toolbar { flex-direction: column; align-items: stretch; }
+    .toolbar-controls { flex-direction: column; }
+    .toolbar input[type="search"] { width: 100%; }
+    .card { padding-left: 24px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <h1>Reading Room</h1>
+    <p>Every word your Kindle caught you looking up, alongside <em>the sentence where you found it</em>. Open your <code>vocab.db</code> file below — nothing leaves your browser.</p>
+  </header>
+
+  <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose or drop your vocab.db file">
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#E8A33D" stroke-width="1.4">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+      <line x1="9" y1="7" x2="15" y2="7"/>
+      <line x1="9" y1="11" x2="15" y2="11"/>
+    </svg>
+    <div class="dz-text">
+      <strong>Drop your vocab.db file here, or click to choose it</strong>
+      <span>On most Kindles it lives at <code>system/vocabulary/vocab.db</code> — connect the device via USB to find it.</span>
+    </div>
+    <input type="file" id="file-input" accept=".db" />
+  </div>
+
+  <div class="status-msg" id="status-msg"></div>
+
+  <div class="toolbar" id="toolbar">
+    <div class="stats" id="stats"></div>
+    <div class="toolbar-controls">
+      <input type="search" id="search" placeholder="Search words or sentences…" />
+      <select id="book-filter">
+        <option value="all">All books</option>
+      </select>
+      <select id="sort-select">
+        <option value="recent">Most recent</option>
+        <option value="az">A → Z</option>
+        <option value="book">By book</option>
+        <option value="random">Random</option>
+      </select>
+      <div class="random-controls" id="random-controls">
+        <span>Show</span>
+        <input type="number" id="random-count" min="1" value="20" />
+        <button class="btn" id="shuffle-btn">Shuffle</button>
+      </div>
+      <button class="btn" id="export-btn">Export CSV</button>
+      <button class="btn" id="copy-words-btn">Copy words</button>
+      <button class="btn" id="export-words-btn">Export words</button>
+    </div>
+    <div class="export-note">Exports use the words currently shown below — search, book filter, and random selection all apply.</div>
+  </div>
+
+  <div class="empty-state" id="empty-state">
+    <h3>No matches</h3>
+    <div>Try a different word, or clear the search.</div>
+  </div>
+
+  <div id="cards-container"></div>
+
+  <footer>
+    Runs entirely client-side using sql.js — your vocab.db is parsed in this tab and is never uploaded anywhere.
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script>
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('file-input');
+  const statusMsg = document.getElementById('status-msg');
+  const toolbar = document.getElementById('toolbar');
+  const statsEl = document.getElementById('stats');
+  const cardsContainer = document.getElementById('cards-container');
+  const emptyState = document.getElementById('empty-state');
+  const searchInput = document.getElementById('search');
+  const bookFilter = document.getElementById('book-filter');
+  const sortSelect = document.getElementById('sort-select');
+  const randomControls = document.getElementById('random-controls');
+  const randomCount = document.getElementById('random-count');
+  const shuffleBtn = document.getElementById('shuffle-btn');
+  const exportBtn = document.getElementById('export-btn');
+  const copyWordsBtn = document.getElementById('copy-words-btn');
+  const exportWordsBtn = document.getElementById('export-words-btn');
+
+  let entries = [];
+  let lastFiltered = [];
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') fileInput.click();
+  });
+  ['dragenter', 'dragover'].forEach(evt => {
+    dropzone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropzone.classList.add('drag');
+    });
+  });
+  ['dragleave', 'drop'].forEach(evt => {
+    dropzone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('drag');
+    });
+  });
+  dropzone.addEventListener('drop', (e) => {
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) handleFile(file);
+  });
+
+  function showStatus(text, type) {
+    statusMsg.textContent = text;
+    statusMsg.className = 'status-msg ' + type;
+  }
+  function clearStatus() {
+    statusMsg.className = 'status-msg';
+    statusMsg.textContent = '';
+  }
+
+  async function handleFile(file) {
+    entries = [];
+    toolbar.classList.remove('active');
+    cardsContainer.innerHTML = '';
+    emptyState.classList.remove('active');
+    searchInput.value = '';
+    sortSelect.value = 'recent';
+    randomControls.classList.remove('active');
+    showStatus('Reading ' + file.name + '…', 'loading');
+
+    try {
+      const buf = await file.arrayBuffer();
+      const SQL = await initSqlJs({
+        locateFile: f => 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/' + f
+      });
+      const db = new SQL.Database(new Uint8Array(buf));
+
+      let res;
+      try {
+        res = db.exec(`
+          SELECT
+            W.word      AS word,
+            W.stem      AS stem,
+            W.timestamp AS ts,
+            L.usage     AS sentence,
+            B.title     AS title,
+            B.authors   AS authors
+          FROM WORDS W
+          LEFT JOIN LOOKUPS L ON W.id = L.word_key
+          LEFT JOIN BOOK_INFO B ON L.book_key = B.id
+          ORDER BY W.timestamp DESC
+        `);
+      } catch (queryErr) {
+        throw new Error('SCHEMA');
+      }
+
+      if (!res || res.length === 0) {
+        entries = [];
+      } else {
+        const cols = res[0].columns;
+        entries = res[0].values.map(row => {
+          const obj = {};
+          cols.forEach((c, i) => obj[c] = row[i]);
+          return obj;
+        });
+      }
+
+      db.close();
+
+      if (entries.length === 0) {
+        showStatus('That file opened fine, but no vocabulary entries were found in it.', 'error');
+        return;
+      }
+
+      clearStatus();
+      toolbar.classList.add('active');
+      populateBookFilter();
+      reshuffle();
+      render();
+
+    } catch (err) {
+      if (err && err.message === 'SCHEMA') {
+        showStatus('This file opened, but doesn\u2019t look like a Kindle vocab.db — the WORDS/LOOKUPS tables weren\u2019t found.', 'error');
+      } else {
+        showStatus('Couldn\u2019t read that file as a SQLite database. Make sure you selected the vocab.db file itself.', 'error');
+      }
+    }
+  }
+
+  function formatDate(ts) {
+    if (!ts) return '';
+    const n = Number(ts);
+    if (!n) return '';
+    const d = new Date(n);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  function renderSentence(container, sentence, word, stem) {
+    if (!sentence) {
+      const span = document.createElement('span');
+      span.className = 'card-sentence none';
+      span.textContent = 'No sentence was captured for this word.';
+      container.appendChild(span);
+      return;
+    }
+    const p = document.createElement('p');
+    p.className = 'card-sentence';
+
+    const target = (stem && sentence.toLowerCase().includes(stem.toLowerCase())) ? stem : word;
+    let regex;
+    try {
+      regex = new RegExp('(' + target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\w*)', 'i');
+    } catch (e) {
+      regex = null;
+    }
+
+    if (regex) {
+      const parts = sentence.split(regex);
+      parts.forEach((part, i) => {
+        if (i % 2 === 1) {
+          const mark = document.createElement('mark');
+          mark.textContent = part;
+          p.appendChild(mark);
+        } else if (part) {
+          p.appendChild(document.createTextNode(part));
+        }
+      });
+    } else {
+      p.textContent = sentence;
+    }
+    container.appendChild(p);
+  }
+
+  function populateBookFilter() {
+    while (bookFilter.options.length > 1) bookFilter.remove(1);
+    const titles = Array.from(new Set(entries.filter(e => e.title).map(e => e.title)))
+      .sort((a, b) => a.localeCompare(b));
+    titles.forEach(title => {
+      const opt = document.createElement('option');
+      opt.value = title;
+      opt.textContent = title;
+      bookFilter.appendChild(opt);
+    });
+    bookFilter.value = 'all';
+  }
+
+  function reshuffle() {
+    const order = entries.map((_, i) => i);
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    order.forEach((entryIndex, rank) => {
+      entries[entryIndex]._randomRank = rank;
+    });
+  }
+
+  function render() {
+    const query = searchInput.value.trim().toLowerCase();
+    const sortMode = sortSelect.value;
+    const bookValue = bookFilter.value;
+
+    randomControls.classList.toggle('active', sortMode === 'random');
+
+    let filtered = entries.filter(e => {
+      if (bookValue !== 'all' && e.title !== bookValue) return false;
+      if (!query) return true;
+      return (e.word && e.word.toLowerCase().includes(query)) ||
+             (e.sentence && e.sentence.toLowerCase().includes(query)) ||
+             (e.title && e.title.toLowerCase().includes(query));
+    });
+
+    filtered = filtered.slice();
+    if (sortMode === 'az') {
+      filtered.sort((a, b) => (a.word || '').localeCompare(b.word || ''));
+    } else if (sortMode === 'book') {
+      filtered.sort((a, b) => (a.title || 'zzz').localeCompare(b.title || 'zzz'));
+    } else if (sortMode === 'random') {
+      filtered.sort((a, b) => a._randomRank - b._randomRank);
+      let n = parseInt(randomCount.value, 10);
+      if (!n || n < 1) n = 1;
+      if (n > filtered.length) n = filtered.length;
+      filtered = filtered.slice(0, n);
+    } else {
+      filtered.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    }
+
+    const bookCount = new Set(entries.filter(e => e.title).map(e => e.title)).size;
+    let statsHtml = '<strong>' + filtered.length + '</strong>';
+    statsHtml += filtered.length === entries.length ? ' words' : ' of <strong>' + entries.length + '</strong> words shown';
+    if (bookValue === 'all' && bookCount) {
+      statsHtml += ' across <strong>' + bookCount + '</strong> books';
+    } else if (bookValue !== 'all') {
+      statsHtml += ' from this book';
+    }
+    statsEl.innerHTML = statsHtml;
+    lastFiltered = filtered;
+
+    cardsContainer.innerHTML = '';
+    emptyState.classList.toggle('active', filtered.length === 0);
+
+    filtered.forEach(e => {
+      const card = document.createElement('div');
+      card.className = 'card';
+
+      const head = document.createElement('div');
+      head.className = 'card-head';
+
+      const wordEl = document.createElement('div');
+      wordEl.className = 'card-word';
+      wordEl.textContent = e.word || '(unknown word)';
+      head.appendChild(wordEl);
+
+      const metaEl = document.createElement('div');
+      metaEl.className = 'card-meta';
+      metaEl.textContent = formatDate(e.ts);
+      head.appendChild(metaEl);
+
+      card.appendChild(head);
+      renderSentence(card, e.sentence, e.word, e.stem);
+
+      if (e.title) {
+        const source = document.createElement('div');
+        source.className = 'card-source';
+        const bookSpan = document.createElement('span');
+        bookSpan.className = 'book-title';
+        bookSpan.textContent = e.title;
+        source.appendChild(document.createTextNode('From '));
+        source.appendChild(bookSpan);
+        if (e.authors) {
+          source.appendChild(document.createTextNode(' — ' + e.authors));
+        }
+        card.appendChild(source);
+      }
+
+      cardsContainer.appendChild(card);
+    });
+  }
+
+  searchInput.addEventListener('input', render);
+  bookFilter.addEventListener('change', render);
+  sortSelect.addEventListener('change', render);
+  randomCount.addEventListener('input', render);
+  shuffleBtn.addEventListener('click', () => {
+    reshuffle();
+    render();
+  });
+
+  function flashBtn(btn, text) {
+    const original = btn.textContent;
+    btn.textContent = text;
+    btn.disabled = true;
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.disabled = false;
+    }, 1400);
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    return Promise.resolve();
+  }
+
+  function downloadFile(filename, content, mime) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  exportBtn.addEventListener('click', () => {
+    if (lastFiltered.length === 0) return;
+    const header = ['Word', 'Sentence', 'Book', 'Authors', 'Date'];
+    const rows = lastFiltered.map(e => [
+      e.word || '',
+      e.sentence || '',
+      e.title || '',
+      e.authors || '',
+      formatDate(e.ts)
+    ]);
+    const csv = [header, ...rows]
+      .map(r => r.map(field => '"' + String(field).replace(/"/g, '""') + '"').join(','))
+      .join('\n');
+    downloadFile('kindle-vocabulary.csv', csv, 'text/csv;charset=utf-8;');
+  });
+
+  copyWordsBtn.addEventListener('click', () => {
+    if (lastFiltered.length === 0) return;
+    const words = lastFiltered.map(e => e.word || '').filter(Boolean).join('\n');
+    copyText(words).then(() => flashBtn(copyWordsBtn, 'Copied ' + lastFiltered.length + '!'));
+  });
+
+  exportWordsBtn.addEventListener('click', () => {
+    if (lastFiltered.length === 0) return;
+    const words = lastFiltered.map(e => e.word || '').filter(Boolean).join('\n');
+    downloadFile('kindle-words.txt', words, 'text/plain;charset=utf-8;');
+    flashBtn(exportWordsBtn, 'Downloaded!');
+  });
+</script>
+</body>
+</html>
